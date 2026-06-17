@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>oci-connection-demo</groupId>
+    <artifactId>oci-connection-demo</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <oci.sdk.version>3.89.0</oci.sdk.version>
+    </properties>
+
+    <dependencies>
+        <!-- Núcleo del SDK: autenticación, configuración, modelos comunes -->
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-common</artifactId>
+            <version>${oci.sdk.version}</version>
+        </dependency>
+
+        <!-- Servicio Identity: getUser, listRegionSubscriptions, etc. -->
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-identity</artifactId>
+            <version>${oci.sdk.version}</version>
+        </dependency>
+
+        <!-- Usage API: consulta de costos y uso (Cost Analysis por código) -->
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-usageapi</artifactId>
+            <version>${oci.sdk.version}</version>
+        </dependency>
+
+        <!-- Servicio Identity: getUser, listRegionSubscriptions, etc. -->
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-identity</artifactId>
+            <version>${oci.sdk.version}</version>
+        </dependency>
+
+        <!-- Resource Search: resuelve OCID -> nombre legible del recurso -->
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-resourcesearch</artifactId>
+            <version>${oci.sdk.version}</version>
+        </dependency>
+
+        <!-- Core: Compute y Block Storage (attachments instancia <-> volúmenes) -->
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-core</artifactId>
+            <version>${oci.sdk.version}</version>
+        </dependency>
+
+        <!-- Cliente HTTP obligatorio en SDK 3.x -->
+        <dependency>
+            <groupId>com.oracle.oci.sdk</groupId>
+            <artifactId>oci-java-sdk-common-httpclient-jersey3</artifactId>
+            <version>${oci.sdk.version}</version>
+        </dependency>
+
+        <!-- Logging: silencia avisos de SLF4J -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.13</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>oci-connection-demo</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+            </plugin>
+
+            <!-- Ejecutar con: mvn compile exec:java -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>oci.connection.demo.OciConnection</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
