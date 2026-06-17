@@ -9,7 +9,9 @@ import oci.connection.demo.dto.ResourceCostLine;
 import oci.connection.demo.dto.ResourceInfo;
 import oci.connection.demo.naming.ResourceNameResolver;
 import oci.connection.demo.topology.InstanceTopologyResolver;
+import oci.connection.demo.topology.InstanceTopologyResolver.InstanceDetail;
 import oci.connection.demo.topology.InstanceTopologyResolver.InstanceDisks;
+import oci.connection.demo.topology.InstanceTopologyResolver.VolumeDetail;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -19,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class InstanceCostService implements AutoCloseable{
+public class InstanceCostService implements AutoCloseable {
     private static final String INSTANCE_PREFIX = "ocid1.instance.";
 
     private final CostReporter costReporter;
@@ -66,7 +68,6 @@ public class InstanceCostService implements AutoCloseable{
         return out;
     }
 
-    /** Une instancias del catálogo con instancias que tienen costo (por prefijo de OCID). */
     private Set<String> collectInstanceIds(Context c) {
         Set<String> ids = new LinkedHashSet<>();
         for (Map.Entry<String, ResourceInfo> e : c.catalog().entrySet()) {
@@ -81,15 +82,20 @@ public class InstanceCostService implements AutoCloseable{
     private InstanceCost build(ResourceInfo info, Context c) {
         String id = info.identifier();
 
-        // Si el catálogo no tiene nombre, consultamos el Compute API directamente.
-        if (info.displayName() == null || info.displayName().isBlank()) {
-            ResourceInfo fromCompute = topologyResolver.resolveInstanceInfo(id);
-            if (fromCompute != null) info = fromCompute;
+        // describeInstance es fuente autoritativa: nombre, compartimento, AD, OCPUs, RAM.
+        InstanceDetail detail = topologyResolver.describeInstance(id);
+        Double ocpus = null;
+        Double memoryGb = null;
+        if (detail != null) {
+            info = new ResourceInfo(id, detail.displayName(), "Instance",
+                    detail.compartmentId(), detail.availabilityDomain());
+            ocpus = detail.ocpus();
+            memoryGb = detail.memoryGb();
         }
 
         BigDecimal proc = c.proc().getOrDefault(id, BigDecimal.ZERO);
         BigDecimal mem = c.mem().getOrDefault(id, BigDecimal.ZERO);
-        // Standard shapes bill as a single SKU (OTHER), not split into OCPU/Memory.
+        // Standard shapes facturan en un solo SKU (OTHER), no se divide en OCPU/Memory.
         if (proc.signum() == 0 && mem.signum() == 0) {
             proc = c.total().getOrDefault(id, BigDecimal.ZERO);
         }
@@ -99,15 +105,21 @@ public class InstanceCostService implements AutoCloseable{
 
         List<DiskCost> diskCosts = new ArrayList<>();
         for (String bootId : disks.bootVolumeIds()) {
-            diskCosts.add(new DiskCost(bootId, nameOf(bootId, c), "boot",
+            VolumeDetail vd = topologyResolver.describeBootVolume(bootId);
+            String name = vd != null ? vd.name() : nameOf(bootId, c);
+            Long sizeGb = vd != null ? vd.sizeGb() : null;
+            diskCosts.add(new DiskCost(bootId, name, "boot", sizeGb,
                     c.total().getOrDefault(bootId, BigDecimal.ZERO)));
         }
         for (String blockId : disks.blockVolumeIds()) {
-            diskCosts.add(new DiskCost(blockId, nameOf(blockId, c), "block",
+            VolumeDetail vd = topologyResolver.describeVolume(blockId);
+            String name = vd != null ? vd.name() : nameOf(blockId, c);
+            Long sizeGb = vd != null ? vd.sizeGb() : null;
+            diskCosts.add(new DiskCost(blockId, name, "block", sizeGb,
                     c.total().getOrDefault(blockId, BigDecimal.ZERO)));
         }
 
-        return new InstanceCost(id, info.displayName(), proc, mem, diskCosts, c.currency());
+        return new InstanceCost(id, info.displayName(), ocpus, memoryGb, proc, mem, diskCosts, c.currency());
     }
 
     private String nameOf(String ocid, Context c) {
@@ -136,10 +148,7 @@ public class InstanceCostService implements AutoCloseable{
                 currency = l.currency();
             }
             String rid = l.resourceId();
-            if (rid == null) {
-                continue;
-            }
-            // La Usage API incluye resourceName; úsalo si Resource Search no lo resolvió.
+            if (rid == null) continue;
             if (l.resourceName() != null && !l.resourceName().isBlank()
                     && !catalog.containsKey(rid)) {
                 catalog.put(rid, new ResourceInfo(rid, l.resourceName(), null, null, null));
@@ -162,11 +171,9 @@ public class InstanceCostService implements AutoCloseable{
         topologyResolver.close();
     }
 
-    /** Datos precalculados que comparten las consultas. */
     private record Context(Map<String, ResourceInfo> catalog,
                            Map<String, BigDecimal> total,
                            Map<String, BigDecimal> proc,
                            Map<String, BigDecimal> mem,
-                           String currency) {
-    }
+                           String currency) {}
 }
